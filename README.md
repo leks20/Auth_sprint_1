@@ -1,5 +1,5 @@
 ## Адрес репозитория
-https://github.com/do8rolyuboff/Auth_sprint_1
+https://github.com/leks20/Auth_sprint_1
 
 ## Запуск приложения
 docker-compose up --build 
