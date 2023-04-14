@@ -5,6 +5,7 @@ from pydantic import BaseSettings, PostgresDsn, validator
 
 class Settings(BaseSettings):
     secret_key: str
+    jwt_algorithm: str
 
     postgres_host: str
     postgres_password: str
@@ -25,6 +26,8 @@ class Settings(BaseSettings):
 
     sqlalchemy_database_uri: PostgresDsn | None = None
 
+    request_limit_per_minute: int
+
     @validator("sqlalchemy_database_uri", pre=True)
     def assemble_db_connection(cls, v: str | None, values: Dict[str, Any]) -> Any:
         if isinstance(v, str):
@@ -36,7 +39,7 @@ class Settings(BaseSettings):
             password=values.get("postgres_password"),
             host=values.get("postgres_host"),
             path=f"/{values.get('postgres_db') or ''}",
-            # port=str(values.get("postgres_port")),
+            port=str(values.get("postgres_port")),
         )
 
     class Config:

@@ -47,3 +47,8 @@ WTForms==3.0.1
 zope.event==4.6
 zope.interface==5.5.2
 python-dotenv
+opentelemetry-api==1.17.0
+opentelemetry-sdk==1.17.0
+opentelemetry-instrumentation-flask==0.38b0
+opentelemetry-exporter-jaeger==1.17.0
+user_agents==2.2.0

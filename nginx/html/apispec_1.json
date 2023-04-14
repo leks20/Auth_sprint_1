@@ -1,1 +1,352 @@
-{"definitions":{},"info":{"description":"powered by Flasgger","termsOfService":"/tos","title":"A swagger API","version":"0.0.1"},"paths":{"/auth/change-password":{"patch":{"parameters":[{"in":"path","name":"new_password","required":true,"type":"string"},{"in":"path","name":"old_password","required":true,"type":"string"}],"responses":{"200":{"description":"Successful"}},"summary":"Change-password endpoint"}},"/auth/login":{"get":{"parameters":[{"in":"path","name":"email","required":true,"type":"string"},{"in":"path","name":"password","required":true,"type":"string"}],"responses":{"200":{"description":"Successful"}},"summary":"Login endpoint"},"post":{"parameters":[{"in":"path","name":"email","required":true,"type":"string"},{"in":"path","name":"password","required":true,"type":"string"}],"responses":{"200":{"description":"Successful"}},"summary":"Login endpoint"}},"/auth/login_history":{"get":{"responses":{"200":{"description":"login history"}},"summary":"Login history endpoint"}},"/auth/logout":{"get":{"responses":{"200":{"description":"token successfully revoked"}},"summary":"Logout endpoint"}},"/auth/refresh":{"post":{"responses":{"200":{"description":"Successful"}},"summary":"JWT refresh endpoint"}},"/auth/register":{"get":{"parameters":[{"in":"path","name":"email","required":true,"type":"string"},{"in":"path","name":"password","required":true,"type":"string"}],"responses":{"200":{"description":"Successful"}},"summary":"Register endpoint"},"post":{"parameters":[{"in":"path","name":"email","required":true,"type":"string"},{"in":"path","name":"password","required":true,"type":"string"}],"responses":{"200":{"description":"Successful"}},"summary":"Register endpoint"}}},"swagger":"2.0"}
+{
+    "definitions": {},
+    "info": {
+      "description": "powered by Flasgger",
+      "termsOfService": "/tos",
+      "title": "A swagger API",
+      "version": "0.0.1"
+    },
+    "paths": {
+      "/auth/change_password": {
+        "patch": {
+          "parameters": [
+            {
+              "in": "header",
+              "name": "Authorization",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "formData",
+              "name": "old_password",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "formData",
+              "name": "new_password",
+              "required": true,
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Change password",
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "summary": "Change password endpoint",
+          "tags": [
+            "Auth"
+          ]
+        }
+      },
+      "/auth/login": {
+        "post": {
+          "parameters": [
+            {
+              "in": "formData",
+              "name": "email",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "formData",
+              "name": "password",
+              "required": true,
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful"
+            },
+            "400": {
+              "description": "Bad Request"
+            }
+          },
+          "summary": "Login endpoint",
+          "tags": [
+            "Auth"
+          ]
+        }
+      },
+      "/auth/login_history": {
+        "get": {
+          "parameters": [
+            {
+              "description": "Bearer token",
+              "in": "header",
+              "name": "Authorization",
+              "required": true,
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Returns login history",
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "summary": "Login history endpoint",
+          "tags": [
+            "Auth"
+          ]
+        }
+      },
+      "/auth/logout": {
+        "get": {
+          "parameters": [
+            {
+              "in": "header",
+              "name": "Authorization",
+              "required": true,
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Logout",
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "summary": "Logout endpoint",
+          "tags": [
+            "Auth"
+          ]
+        }
+      },
+      "/auth/refresh": {
+        "post": {
+          "parameters": [
+            {
+              "in": "header",
+              "name": "Authorization",
+              "required": true,
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Refresh token",
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "summary": "Refresh token",
+          "tags": [
+            "Auth"
+          ]
+        }
+      },
+      "/auth/register": {
+        "post": {
+          "parameters": [
+            {
+              "in": "formData",
+              "name": "email",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "formData",
+              "name": "password",
+              "required": true,
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful"
+            },
+            "400": {
+              "description": "Bad Request"
+            }
+          },
+          "summary": "Register endpoint",
+          "tags": [
+            "Auth"
+          ]
+        }
+      },
+      "/auth/verify_token": {
+        "get": {
+          "parameters": [
+            {
+              "in": "header",
+              "name": "Authorization",
+              "required": true,
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Token is valid",
+              "schema": {
+                "type": "string"
+              }
+            },
+            "401": {
+              "description": "Token is invalid or expired",
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "summary": "Verify JWT token endpoint",
+          "tags": [
+            "Auth"
+          ]
+        }
+      },
+      "/roles/": {
+        "get": {
+          "parameters": [
+            {
+              "in": "header",
+              "name": "Authorization",
+              "required": true,
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Get roles",
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "tags": [
+            "Roles"
+          ]
+        },
+        "post": {
+          "parameters": [
+            {
+              "in": "header",
+              "name": "Authorization",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "formData",
+              "name": "name",
+              "required": "true",
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Create role",
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "tags": [
+            "Roles"
+          ]
+        }
+      },
+      "/roles/change_name": {
+        "put": {
+          "parameters": [
+            {
+              "in": "header",
+              "name": "Authorization",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "formData",
+              "name": "role_id",
+              "required": "true",
+              "type": "string"
+            },
+            {
+              "in": "formData",
+              "name": "new_name",
+              "required": "true",
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Update role",
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "tags": [
+            "Roles"
+          ]
+        }
+      },
+      "/roles/{role_id}": {
+        "delete": {
+          "parameters": [
+            {
+              "in": "header",
+              "name": "Authorization",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "path",
+              "name": "role_id",
+              "required": "true",
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Delete role",
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "tags": [
+            "Roles"
+          ]
+        },
+        "get": {
+          "parameters": [
+            {
+              "in": "header",
+              "name": "Authorization",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "path",
+              "name": "role_id",
+              "required": "true",
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Get role by id",
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "tags": [
+            "Roles"
+          ]
+        }
+      }
+    },
+    "swagger": "2.0"
+  }

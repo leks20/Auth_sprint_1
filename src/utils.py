@@ -69,3 +69,8 @@ def create_superuser(email, password):
             jsonify({"status": "error", "message": "User already exists!"}),
             HTTPStatus.BAD_REQUEST,
         )
+
+
+def email_exists(email):
+    existing_user = User.query.filter_by(email=email).first()
+    return existing_user is not None

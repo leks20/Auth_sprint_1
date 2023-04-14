@@ -1,16 +1,23 @@
 import uuid
+
 from datetime import datetime
+from sqlalchemy import UniqueConstraint
 
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from werkzeug.security import check_password_hash, generate_password_hash
+from sqlalchemy import text
 
 from db import db
 
 
 class User(db.Model):
     __tablename__ = "users"
-
+    __table_args__ = (
+        {
+            'postgresql_partition_by': 'HASH (id)',
+        }
+    )
     id = db.Column(
         UUID(as_uuid=True),
         primary_key=True,
@@ -18,11 +25,12 @@ class User(db.Model):
         unique=True,
         nullable=False,
     )
-    email = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(80), nullable=False)
     password = db.Column(db.String(250), nullable=False)
-    role_id = db.Column(db.Integer, db.ForeignKey("role.id", ondelete="CASCADE"))
 
+    role_id = db.Column(db.Integer, db.ForeignKey("role.id", ondelete="CASCADE"))
     role = relationship("Role", back_populates="user")
+
     login_histories = relationship(
         "LoginHistory", back_populates="user", passive_deletes=True
     )
@@ -54,13 +62,17 @@ class LoginHistory(db.Model):
     """Модель для истории входов в аккаунт пользователя"""
 
     __tablename__ = "login_history"
+    __table_args__ = (
+        {
+            'postgresql_partition_by': 'LIST (user_device_type)',
+        }
+    )
 
     id = db.Column(
         UUID(as_uuid=True),
         primary_key=True,
         default=uuid.uuid4,
         nullable=False,
-        unique=True,
     )
     user_id = db.Column(
         UUID(as_uuid=True),
@@ -69,13 +81,14 @@ class LoginHistory(db.Model):
     )
 
     user = relationship("User", back_populates="login_histories", passive_deletes=True)
-    user_agent = db.Column(db.String(500), nullable=True)
+    user_agent = db.Column(db.Text, nullable=True)
     ip_address = db.Column(db.String(80), nullable=True)
     auth_datetime = db.Column(db.DateTime, default=datetime.now(), nullable=False)
+    user_device_type = db.Column(db.Text, primary_key=True)
+
 
     def __repr__(self):
         return f"LoginHistory: {self.user_agent} - {self.auth_datetime}"
-
 
 class Role(db.Model):
     id = db.Column(db.Integer, primary_key=True)
