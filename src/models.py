@@ -1,12 +1,11 @@
 import uuid
 
 from datetime import datetime
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import CheckConstraint
 
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from werkzeug.security import check_password_hash, generate_password_hash
-from sqlalchemy import text
 
 from db import db
 
@@ -14,6 +13,8 @@ from db import db
 class User(db.Model):
     __tablename__ = "users"
     __table_args__ = (
+        CheckConstraint("password IS NOT NULL OR google_id IS NOT NULL",
+                        name="check_password_or_google_id_present"),
         {
             'postgresql_partition_by': 'HASH (id)',
         }
@@ -26,7 +27,8 @@ class User(db.Model):
         nullable=False,
     )
     email = db.Column(db.String(80), nullable=False)
-    password = db.Column(db.String(250), nullable=False)
+    password = db.Column(db.String(250), nullable=True)
+    google_id = db.Column(db.String(250), nullable=True)
 
     role_id = db.Column(db.Integer, db.ForeignKey("role.id", ondelete="CASCADE"))
     role = relationship("Role", back_populates="user")

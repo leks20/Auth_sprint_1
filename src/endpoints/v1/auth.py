@@ -1,7 +1,6 @@
 import logging
 import jwt
 from jwt.exceptions import ExpiredSignatureError
-from user_agents import parse
 
 from http import HTTPStatus
 from flasgger import swag_from
@@ -24,7 +23,7 @@ from redis_client import redis_client
 from flask_wtf.csrf import CSRFProtect
 
 from rate_limit import limit_requests
-from utils import email_exists
+from utils import create_login_history, email_exists
 
 
 csrf = CSRFProtect()
@@ -142,35 +141,20 @@ def login():
         form_password = form.password.data
 
         if user := User.query.filter_by(email=form_login).first():
-            if user.verify_password(form_password):
+
+            if user.google_id:
+                return (
+                    jsonify({"status": "error", "message": "Please log in with your Google account."}),
+                    HTTPStatus.BAD_REQUEST,
+                )
+            elif user.verify_password(form_password):
                 identity = {"id": user.id, "role": user.role.name}
 
                 access_token = create_access_token(identity=identity, fresh=True)
                 refresh_token = create_refresh_token(identity=identity)
 
-                user_id = str(user.id)
-                user_agent_string = request.headers.get("user-agent", "")
-                user_agent_parsed = parse(user_agent_string)
+                create_login_history(user.id)
 
-                if user_agent_parsed.is_mobile:
-                    user_device_type = "mobile"
-                elif user_agent_parsed.is_tablet:
-                    user_device_type = "tablet"
-                elif user_agent_parsed.is_pc:
-                    user_device_type = "web"
-                else:
-                    user_device_type = "other"
-
-                user_host = request.headers.get("host", "")
-                user_info = LoginHistory(
-                    user_id=user_id,
-                    user_agent=user_agent_string,
-                    ip_address=user_host,
-                    user_device_type=user_device_type,
-
-                )
-                db.session.add(user_info)
-                db.session.commit()
                 return (
                     jsonify(
                         {
@@ -181,10 +165,12 @@ def login():
                     ),
                     HTTPStatus.OK,
                 )
-        return (
-            jsonify({"status": "error", "message": "Invalid login credentials!"}),
-            HTTPStatus.BAD_REQUEST,
-        )
+            
+            else:
+                return (
+                    jsonify({"status": "error", "message": "Invalid login credentials!"}),
+                    HTTPStatus.BAD_REQUEST,
+                )
 
     errors = form.errors.items()
     error_message = "\n".join([f"{param}: {error[0]}" for param, error in errors])
