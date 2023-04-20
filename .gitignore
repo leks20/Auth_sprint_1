@@ -132,3 +132,5 @@ dmypy.json
 # Pycharm
 .idea/
 .vscode/
+
+src/ssl*

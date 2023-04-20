@@ -1,4 +1,7 @@
 import logging
+import jwt
+from jwt.exceptions import ExpiredSignatureError
+
 from http import HTTPStatus
 from flasgger import swag_from
 from flask import Blueprint, jsonify, request
@@ -16,8 +19,11 @@ from conf.config import settings
 from db import db
 from forms import LoginForm, RegisterForm
 from models import LoginHistory, Role, User
-from redis_client import jwt_redis_blocklist
+from redis_client import redis_client
 from flask_wtf.csrf import CSRFProtect
+
+from rate_limit import limit_requests
+from utils import create_login_history, email_exists
 
 
 csrf = CSRFProtect()
@@ -25,24 +31,36 @@ auth = Blueprint("auth", __name__)
 
 
 @auth.route("/register", methods=["POST"])
+@swag_from(
+    {
+        "tags": ["Auth"],
+        "parameters": [
+            {
+                "name": "email",
+                "in": "formData",
+                "type": "string",
+                "required": True
+            },
+            {
+                "name": "password",
+                "in": "formData",
+                "type": "string",
+                "required": True
+            }
+        ],
+        "responses": {
+            "200": {
+                "description": "Successful"
+            },
+            "400": {
+                "description": "Bad Request"
+            }
+        }
+    }
+)
 def register():
     """
     Register endpoint
-    ---
-    responses:
-      200:
-        description: Successful
-    parameters:
-      - name: email
-        in: formData
-        type: string
-        required: true
-      - name: password
-        in: formData
-        type: string
-        required: true
-    tags:
-      - Auth
     """
     form = RegisterForm(request.form)
 
@@ -51,7 +69,13 @@ def register():
     if request.method == "POST" and "email" in form and "password" in form:
         email = form.email.data
         password = form.password.data
-
+        
+        if email_exists(email):
+            return (
+                jsonify({"status": "error", "message": "Email already in use"}),
+                HTTPStatus.BAD_REQUEST,
+            )
+        
         if not (user_role := Role.query.filter_by(name="user").first()):
             user_role = Role(name="user")
             db.session.add(user_role)
@@ -79,24 +103,36 @@ def register():
 
 
 @auth.route("/login", methods=["POST"])
+@swag_from(
+    {
+        "tags": ["Auth"],
+        "parameters": [
+            {
+                "name": "email",
+                "in": "formData",
+                "type": "string",
+                "required": True
+            },
+            {
+                "name": "password",
+                "in": "formData",
+                "type": "string",
+                "required": True
+            }
+        ],
+        "responses": {
+            "200": {
+                "description": "Successful"
+            },
+            "400": {
+                "description": "Bad Request"
+            }
+        }
+    }
+)
 def login():
     """
     Login endpoint
-    ---
-    responses:
-      200:
-        description: Successful
-    parameters:
-      - name: email
-        in: formData
-        type: string
-        required: true
-      - name: password
-        in: formData
-        type: string
-        required: true
-    tags:
-      - Auth
     """
     form = LoginForm(request.form)
 
@@ -105,22 +141,20 @@ def login():
         form_password = form.password.data
 
         if user := User.query.filter_by(email=form_login).first():
-            if user.verify_password(form_password):
+
+            if user.google_id:
+                return (
+                    jsonify({"status": "error", "message": "Please log in with your Google account."}),
+                    HTTPStatus.BAD_REQUEST,
+                )
+            elif user.verify_password(form_password):
                 identity = {"id": user.id, "role": user.role.name}
 
                 access_token = create_access_token(identity=identity, fresh=True)
                 refresh_token = create_refresh_token(identity=identity)
 
-                user_id = str(user.id)
-                user_agent = request.headers.get("user-agent", "")
-                user_host = request.headers.get("host", "")
-                user_info = LoginHistory(
-                    user_id=user_id,
-                    user_agent=user_agent,
-                    ip_address=user_host,
-                )
-                db.session.add(user_info)
-                db.session.commit()
+                create_login_history(user.id)
+
                 return (
                     jsonify(
                         {
@@ -131,10 +165,12 @@ def login():
                     ),
                     HTTPStatus.OK,
                 )
-        return (
-            jsonify({"status": "error", "message": "Invalid login credentials!"}),
-            HTTPStatus.BAD_REQUEST,
-        )
+            
+            else:
+                return (
+                    jsonify({"status": "error", "message": "Invalid login credentials!"}),
+                    HTTPStatus.BAD_REQUEST,
+                )
 
     errors = form.errors.items()
     error_message = "\n".join([f"{param}: {error[0]}" for param, error in errors])
@@ -170,6 +206,14 @@ def refresh():
     Refresh token
     """
     identity = get_jwt_identity()
+    user_id=identity["id"]
+
+    if limit_requests(user_id):
+        return (
+            jsonify({"status": "error", "message": "Too many requests"}),
+            HTTPStatus.TOO_MANY_REQUESTS,
+        )
+    
     access_token = create_access_token(identity=identity, fresh=False)
 
     return jsonify({"access_token": access_token}), HTTPStatus.OK
@@ -200,10 +244,21 @@ def logout():
     """
     Logout endpoint
     """
+    identity = get_jwt_identity()
+    user_id=identity["id"]
+
+    if limit_requests(user_id):
+        return (
+            jsonify({"status": "error", "message": "Too many requests"}),
+            HTTPStatus.TOO_MANY_REQUESTS,
+        )
+    
     token = get_jwt()
     jti = token["jti"]
     ttype = token["type"]
-    jwt_redis_blocklist.set(jti, "", ex=settings.access_expires)
+    redis_key = f"jwt_blocklist:{jti}"
+    redis_client.set(redis_key, "", ex=settings.access_expires)
+
     return (
         jsonify(msg=f"{ttype.capitalize()} token successfully revoked"),
         HTTPStatus.OK,
@@ -239,7 +294,15 @@ def login_history():
     page = request.args.get("page", default=1, type=int)
     page_size = request.args.get("page_size", default=10, type=int)
     identity = get_jwt_identity()
-    history = LoginHistory.query.filter_by(user_id=identity["id"]).paginate(
+    user_id=identity["id"]
+
+    if limit_requests(user_id):
+        return (
+            jsonify({"status": "error", "message": "Too many requests"}),
+            HTTPStatus.TOO_MANY_REQUESTS,
+        )
+
+    history = LoginHistory.query.filter_by(user_id=user_id).paginate(
         page=page, per_page=page_size
     )
     return (
@@ -250,6 +313,7 @@ def login_history():
                         "user_agent": row.user_agent,
                         "ip_address": row.ip_address,
                         "auth_datetime": row.auth_datetime,
+                        "user_device_type": row.user_device_type
                     }
                     for row in history.items
                 ],
@@ -302,7 +366,15 @@ def change_password():
     new_password = request.form.get("new_password")
 
     identity = get_jwt_identity()
-    user = User.query.filter_by(id=identity["id"]).first()
+    user_id=identity["id"]
+
+    if limit_requests(user_id):
+        return (
+            jsonify({"status": "error", "message": "Too many requests"}),
+            HTTPStatus.TOO_MANY_REQUESTS,
+        )
+    user = User.query.filter_by(id=user_id).first()
+    
     if user is None:
         return jsonify({"message": "User not found."}), HTTPStatus.OK
 
@@ -313,3 +385,57 @@ def change_password():
         return jsonify({"message": "Password changed successfully"}), HTTPStatus.OK
 
     return jsonify({"message": "You entered the wrong old password"}), HTTPStatus.OK
+
+
+@auth.route("/verify_token", methods=["GET"])
+@jwt_required(verify_type=False)
+@swag_from(
+    {
+        "tags": ["Auth"],
+        "parameters": [
+            {
+                "name": "Authorization",
+                "in": "header",
+                "type": "string",
+                "required": True,
+            },
+    ],
+        "responses": {
+            "200": {
+                "description": "Token is valid",
+                "schema": {"type": "string"},
+            },
+            "401": {
+                "description": "Token is invalid or expired",
+                "schema": {"type": "string"},
+            },
+        },
+    }
+)
+def verify_token():
+    """
+    Verify JWT token endpoint
+    """
+
+    token = request.headers.get("Authorization").split(" ")[1]
+
+    try:
+        jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
+    except ExpiredSignatureError:
+        return jsonify({"message": "Token is expired"}), HTTPStatus.UNAUTHORIZED
+
+    identity = get_jwt_identity()
+    user_id=identity["id"]
+
+    if limit_requests(user_id):
+        return (
+            jsonify({"status": "error", "message": "Too many requests"}),
+            HTTPStatus.TOO_MANY_REQUESTS,
+        )
+    
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({"message": "User on found"}), HTTPStatus.NOT_FOUND
+    
+    return jsonify({"message": "Token verified"}), HTTPStatus.OK
