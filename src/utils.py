@@ -6,9 +6,11 @@ from flask import jsonify
 from flask.cli import AppGroup
 from flask_jwt_extended import get_jwt
 from sqlalchemy.exc import IntegrityError
+from user_agents import parse
+from flask import request
 
 from db import db
-from models import Role, User
+from models import LoginHistory, Role, User
 
 
 superuser_cli = AppGroup("user")
@@ -74,3 +76,37 @@ def create_superuser(email, password):
 def email_exists(email):
     existing_user = User.query.filter_by(email=email).first()
     return existing_user is not None
+
+
+def credentials_to_dict(credentials):
+  return {'token': credentials.token,
+          'refresh_token': credentials.refresh_token,
+          'token_uri': credentials.token_uri,
+          'client_id': credentials.client_id,
+          'client_secret': credentials.client_secret,
+          'scopes': credentials.scopes}
+
+def create_login_history(user_id: str, request: request) -> None:
+    user_agent_string = request.headers.get("user-agent", "")
+    user_agent_parsed = parse(user_agent_string)
+
+    if user_agent_parsed.is_mobile:
+        user_device_type = "mobile"
+    elif user_agent_parsed.is_tablet:
+        user_device_type = "tablet"
+    elif user_agent_parsed.is_pc:
+        user_device_type = "web"
+    else:
+        user_device_type = "other"
+
+    user_host = request.headers.get("host", "")
+
+    user_info = LoginHistory(
+        user_id=user_id,
+        user_agent=user_agent_string,
+        ip_address=user_host,
+        user_device_type=user_device_type,
+
+    )
+    db.session.add(user_info)
+    db.session.commit()

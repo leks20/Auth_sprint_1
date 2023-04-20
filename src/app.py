@@ -1,14 +1,14 @@
 import db
 from endpoints.v1.auth import auth
 from endpoints.v1.roles import roles
+from endpoints.v1.google import google
 from flasgger import Swagger
-from flask import Flask, request
+from flask import Flask
 from gevent import monkey
 from flask_jwt_extended import JWTManager
 from conf.config import settings
 from tracer import configure_tracer
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
-
 
 monkey.patch_all()
 
@@ -22,11 +22,11 @@ def create_app():
     FlaskInstrumentor().instrument_app(app)
     app.debug = True
 
-    @app.before_request
-    def before_request():
-        request_id = request.headers.get('X-Request-Id')
-        if not request_id:
-            raise RuntimeError('Request id is required') 
+    # @app.before_request
+    # def before_request():
+    #     request_id = request.headers.get('X-Request-Id')
+    #     if not request_id:
+    #         raise RuntimeError('Request id is required') 
 
     db.init_db(app)
     jwt.init_app(app)
@@ -34,6 +34,7 @@ def create_app():
 
     app.register_blueprint(auth, url_prefix="/auth")
     app.register_blueprint(roles, url_prefix="/roles")
+    app.register_blueprint(google, url_prefix="/google_auth")
 
     app.config["SECRET_KEY"] = settings.secret_key
     app.config["JWT_ACCESS_TOKEN_EXPIRES"] = settings.access_expires
