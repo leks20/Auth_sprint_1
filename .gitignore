@@ -133,5 +133,6 @@ dmypy.json
 .idea/
 .vscode/
 
+# secrets
 ssl
 client_secret.json
