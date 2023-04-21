@@ -133,4 +133,5 @@ dmypy.json
 .idea/
 .vscode/
 
-src/ssl*
+ssl
+client_secret.json
