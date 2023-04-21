@@ -153,7 +153,7 @@ def login():
                 access_token = create_access_token(identity=identity, fresh=True)
                 refresh_token = create_refresh_token(identity=identity)
 
-                create_login_history(user.id)
+                create_login_history(user.id, request)
 
                 return (
                     jsonify(

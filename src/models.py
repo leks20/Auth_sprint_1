@@ -37,9 +37,11 @@ class User(db.Model):
         "LoginHistory", back_populates="user", passive_deletes=True
     )
 
-    def __init__(self, email, password):
+    def __init__(self, email, password, google_id):
         self.email = email
-        self.password = generate_password_hash(password)
+        if password is not None:
+            self.password = generate_password_hash(password)
+        self.google_id = google_id
 
     def __str__(self):
         return f"<User {self.email}>"

@@ -1,12 +1,13 @@
 from http import HTTPStatus
 from flask import redirect, request, jsonify, url_for, Blueprint, session
 from google_auth_oauthlib.flow import Flow
-from google.oauth2.credentials import credentials as google_credentials
+from google.oauth2 import credentials as google_credentials
+
 from flasgger import swag_from
 import requests
 from models import Role, User
 from db import db
-
+import jwt
 from utils import create_login_history, credentials_to_dict, email_exists
 
 google = Blueprint("google", __name__)
@@ -26,10 +27,14 @@ google = Blueprint("google", __name__)
 def google_auth():
     flow = Flow.from_client_secrets_file(
         'client_secret.json',
-        scopes=['openid', 'email', 'profile', 'https://www.googleapis.com/auth/userinfo.profile']
+        scopes=[
+            "openid",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/userinfo.profile"
+        ]
     )
     
-    flow.redirect_uri = url_for('google.auth_callback', _external=True).replace('http', 'https')
+    flow.redirect_uri = url_for('google.auth_callback', _external=True)
 
     authorization_url, state = flow.authorization_url(
         prompt='consent',
@@ -62,20 +67,24 @@ def auth_callback():
 
     flow = Flow.from_client_secrets_file(
         'client_secret.json',
-        scopes=['openid', 'email', 'profile', 'https://www.googleapis.com/auth/userinfo.profile'],
+        scopes=[
+            "openid",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/userinfo.profile"       ],
         state=state
     )   
 
-    flow.redirect_uri = url_for('google.auth_callback', _external=True).replace('http', 'https')
-
+    flow.redirect_uri = url_for('google.auth_callback', _external=True)
 
     flow.fetch_token(authorization_response=request.url)
 
     credentials = flow.credentials
     session['credentials'] = credentials_to_dict(credentials)
 
-    email = credentials.id_token["email"]
-    google_id = credentials.id_token["sub"]
+    decoded_id_token = jwt.decode(credentials.id_token, options={"verify_signature": False})
+
+    email = decoded_id_token["email"]
+    google_id = decoded_id_token["sub"]
 
     if not email_exists(email):
         if not (user_role := Role.query.filter_by(name="user").first()):
@@ -84,6 +93,7 @@ def auth_callback():
             db.session.commit()
         user = User(
             email=email,
+            password=None,
             google_id=google_id,
         )
         user.role = user_role
@@ -92,7 +102,7 @@ def auth_callback():
     else:
         user = User.query.filter_by(email=email).first()
     
-    create_login_history(user.id)
+    create_login_history(user.id, request)
 
     return jsonify(
        {"message": "Authentication successful", "email": email}, HTTPStatus.OK)

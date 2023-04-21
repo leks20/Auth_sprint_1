@@ -1,16 +1,17 @@
+from gevent import monkey
+monkey.patch_all()
+
 import db
 from endpoints.v1.auth import auth
 from endpoints.v1.roles import roles
 from endpoints.v1.google import google
 from flasgger import Swagger
 from flask import Flask
-from gevent import monkey
 from flask_jwt_extended import JWTManager
 from conf.config import settings
 from tracer import configure_tracer
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 
-monkey.patch_all()
 
 jwt = JWTManager()
 swagger = Swagger()
